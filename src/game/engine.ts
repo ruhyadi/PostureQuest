@@ -65,7 +65,7 @@ export function createInitialState(): GameState {
   return {
     phase: 'landing',
     hp: MAX_HP,
-    mana: 0,
+    mana: MAX_MANA,
     postureScore: 0,
     slouchTimer: 0,
     goodPostureTimer: 0,
@@ -235,6 +235,7 @@ export function tickGame(state: GameState, input: TickInput, dt: number): GameSt
       }
     } else {
       next.bossPostureFailTime = 0
+      next.mana = Math.min(MAX_MANA, next.mana + MANA_REGEN_PER_SEC * dt)
     }
 
     next.bossTimeLeft -= dt

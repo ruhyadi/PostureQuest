@@ -7,7 +7,7 @@ export const BOSS_POSTURE_THRESHOLD = 60
 
 export const HP_DRAIN_PER_SEC = 1
 export const HP_REGEN_PER_SEC = 0.5
-export const MANA_REGEN_PER_SEC = 2
+export const MANA_REGEN_PER_SEC = 20
 export const SLOUCH_GRACE_SEC = 3
 
 export const SPELL_MANA_COST = 25

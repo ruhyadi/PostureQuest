@@ -104,14 +104,11 @@ function drawAura(
 
   const leftShoulder = landmarks[11]
   const rightShoulder = landmarks[12]
-  const leftHip = landmarks[23]
-  const rightHip = landmarks[24]
-  if (!leftShoulder || !rightShoulder || !leftHip || !rightHip) return
+  const nose = landmarks[0]
+  if (!leftShoulder || !rightShoulder || !nose) return
 
-  const cx =
-    ((leftShoulder.x + rightShoulder.x + leftHip.x + rightHip.x) / 4) * width
-  const cy =
-    ((leftShoulder.y + rightShoulder.y + leftHip.y + rightHip.y) / 4) * height
+  const cx = ((leftShoulder.x + rightShoulder.x + nose.x) / 3) * width
+  const cy = ((leftShoulder.y + rightShoulder.y + nose.y) / 3) * height
 
   const colors: Record<SpellType, string> = {
     shield: 'rgba(96, 165, 250, 0.4)',

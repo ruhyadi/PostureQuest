@@ -3,21 +3,19 @@ import type { NormalizedLandmark } from '@mediapipe/tasks-vision'
 export interface PostureBaseline {
   shoulderTilt: number
   forwardHead: number
-  hipShoulderOffset: number
+  headDrop: number
 }
 
 export interface PostureMetrics {
   shoulderTilt: number
   forwardHead: number
-  hipShoulderOffset: number
+  headDrop: number
 }
 
 const L = {
   NOSE: 0,
   LEFT_SHOULDER: 11,
   RIGHT_SHOULDER: 12,
-  LEFT_HIP: 23,
-  RIGHT_HIP: 24,
 } as const
 
 function landmarkVisible(lm: NormalizedLandmark): boolean {
@@ -30,29 +28,23 @@ export function extractPostureMetrics(
   const nose = landmarks[L.NOSE]
   const leftShoulder = landmarks[L.LEFT_SHOULDER]
   const rightShoulder = landmarks[L.RIGHT_SHOULDER]
-  const leftHip = landmarks[L.LEFT_HIP]
-  const rightHip = landmarks[L.RIGHT_HIP]
 
   if (
     !landmarkVisible(nose) ||
     !landmarkVisible(leftShoulder) ||
-    !landmarkVisible(rightShoulder) ||
-    !landmarkVisible(leftHip) ||
-    !landmarkVisible(rightHip)
+    !landmarkVisible(rightShoulder)
   ) {
     return null
   }
 
   const shoulderMidX = (leftShoulder.x + rightShoulder.x) / 2
   const shoulderMidY = (leftShoulder.y + rightShoulder.y) / 2
-  const hipMidX = (leftHip.x + rightHip.x) / 2
-  const hipMidY = (leftHip.y + rightHip.y) / 2
 
   const shoulderTilt = Math.abs(leftShoulder.y - rightShoulder.y)
   const forwardHead = Math.abs(nose.x - shoulderMidX)
-  const hipShoulderOffset = Math.abs(shoulderMidX - hipMidX) + Math.abs(shoulderMidY - hipMidY) * 0.5
+  const headDrop = Math.max(0, nose.y - shoulderMidY)
 
-  return { shoulderTilt, forwardHead, hipShoulderOffset }
+  return { shoulderTilt, forwardHead, headDrop }
 }
 
 function deviation(current: number, baseline: number, scale: number): number {
@@ -68,19 +60,15 @@ export function scorePosture(
       100 -
       metrics.shoulderTilt * 400 -
       metrics.forwardHead * 300 -
-      metrics.hipShoulderOffset * 200
+      metrics.headDrop * 350
     return Math.max(0, Math.min(100, raw))
   }
 
   const tiltDev = deviation(metrics.shoulderTilt, baseline.shoulderTilt, 0.08)
   const headDev = deviation(metrics.forwardHead, baseline.forwardHead, 0.12)
-  const stackDev = deviation(
-    metrics.hipShoulderOffset,
-    baseline.hipShoulderOffset,
-    0.15,
-  )
+  const dropDev = deviation(metrics.headDrop, baseline.headDrop, 0.1)
 
-  const penalty = tiltDev * 35 + headDev * 35 + stackDev * 30
+  const penalty = tiltDev * 35 + headDev * 35 + dropDev * 30
   return Math.max(0, Math.min(100, 100 - penalty))
 }
 
@@ -93,16 +81,16 @@ export function averageBaseline(
     (acc, s) => ({
       shoulderTilt: acc.shoulderTilt + s.shoulderTilt,
       forwardHead: acc.forwardHead + s.forwardHead,
-      hipShoulderOffset: acc.hipShoulderOffset + s.hipShoulderOffset,
+      headDrop: acc.headDrop + s.headDrop,
     }),
-    { shoulderTilt: 0, forwardHead: 0, hipShoulderOffset: 0 },
+    { shoulderTilt: 0, forwardHead: 0, headDrop: 0 },
   )
 
   const n = samples.length
   return {
     shoulderTilt: sum.shoulderTilt / n,
     forwardHead: sum.forwardHead / n,
-    hipShoulderOffset: sum.hipShoulderOffset / n,
+    headDrop: sum.headDrop / n,
   }
 }
 
