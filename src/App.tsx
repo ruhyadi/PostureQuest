@@ -50,16 +50,29 @@ function App() {
     }
   }, [phase, calibration.isComplete])
 
-  const handleStart = async () => {
+  useEffect(() => {
+    if (phase !== 'loading' || modelsLoading || modelsError) return
+
+    let cancelled = false
+    ;(async () => {
+      const ok = await startCamera()
+      if (cancelled) return
+      if (ok) {
+        startSession()
+        setPhase('calibration')
+      } else {
+        setPhase('landing')
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [phase, modelsLoading, modelsError, startCamera, startSession])
+
+  const handleStart = () => {
     if (modelsLoading || modelsError) return
     setPhase('loading')
-    const ok = await startCamera()
-    if (ok) {
-      startSession()
-      setPhase('calibration')
-    } else {
-      setPhase('landing')
-    }
   }
 
   const handleRestart = () => {
@@ -75,6 +88,12 @@ function App() {
     setForceBoss(false)
     setPhase('landing')
   }
+
+  const needsCameraMount =
+    phase === 'loading' ||
+    phase === 'calibration' ||
+    phase === 'playing' ||
+    phase === 'boss'
 
   const showGame =
     (phase === 'calibration' || phase === 'playing' || phase === 'boss') &&
@@ -152,36 +171,47 @@ function App() {
           </div>
         )}
 
+        {needsCameraMount && (
+          <div
+            className={
+              showGame
+                ? 'relative'
+                : 'pointer-events-none absolute h-px w-px overflow-hidden opacity-0'
+            }
+          >
+            <CameraStage ref={videoRef} canvasRef={canvasRef} />
+            {showGame && (
+              <>
+                <CalibrationModal
+                  visible={phase === 'calibration'}
+                  progress={calibration.progress}
+                />
+                <BossOverlay
+                  visible={phase === 'boss'}
+                  timeLeft={gameState.bossTimeLeft}
+                  gesturesCast={gameState.bossGesturesCast}
+                  postureScore={gameState.postureScore}
+                />
+              </>
+            )}
+          </div>
+        )}
+
         {showGame && (
-          <>
-            <div className="relative">
-              <CameraStage ref={videoRef} canvasRef={canvasRef} />
-              <CalibrationModal
-                visible={phase === 'calibration'}
-                progress={calibration.progress}
-              />
-              <BossOverlay
-                visible={phase === 'boss'}
-                timeLeft={gameState.bossTimeLeft}
-                gesturesCast={gameState.bossGesturesCast}
-                postureScore={gameState.postureScore}
-              />
-            </div>
-            <div className="flex w-full max-w-xs flex-col gap-3">
-              <GameHUD
-                state={gameState}
-                bossTimeUntil={bossTimeUntil}
-                onSkipToBoss={() => setForceBoss(true)}
-              />
-              <button
-                type="button"
-                onClick={handleEndSession}
-                className="rounded-lg border border-purple-500/30 px-3 py-2 text-xs text-purple-400 transition hover:bg-purple-900/50 hover:text-purple-200"
-              >
-                End session
-              </button>
-            </div>
-          </>
+          <div className="flex w-full max-w-xs flex-col gap-3">
+            <GameHUD
+              state={gameState}
+              bossTimeUntil={bossTimeUntil}
+              onSkipToBoss={() => setForceBoss(true)}
+            />
+            <button
+              type="button"
+              onClick={handleEndSession}
+              className="rounded-lg border border-purple-500/30 px-3 py-2 text-xs text-purple-400 transition hover:bg-purple-900/50 hover:text-purple-200"
+            >
+              End session
+            </button>
+          </div>
         )}
 
         {phase === 'summary' && (

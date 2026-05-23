@@ -45,6 +45,7 @@ export function useGameLoop(
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const pendingStreamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number>(0)
   const lastTimeRef = useRef<number>(0)
   const frameSkipRef = useRef(0)
@@ -75,7 +76,35 @@ export function useGameLoop(
     }
   }, [])
 
+  const attachStreamToVideo = useCallback(async (stream: MediaStream): Promise<boolean> => {
+    const video = videoRef.current
+    if (!video) {
+      pendingStreamRef.current = stream
+      return true
+    }
+
+    video.srcObject = stream
+    try {
+      await video.play()
+      setCameraReady(true)
+      return true
+    } catch (err) {
+      stream.getTracks().forEach((t) => t.stop())
+      setCameraError(
+        err instanceof Error ? err.message : 'Could not start camera preview.',
+      )
+      return false
+    }
+  }, [])
+
   const startCamera = useCallback(async (): Promise<boolean> => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError(
+        'Camera API unavailable. Use HTTPS or localhost, not a plain HTTP URL.',
+      )
+      return false
+    }
+
     setCameraError(null)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -87,27 +116,37 @@ export function useGameLoop(
         audio: false,
       })
 
-      const video = videoRef.current
-      if (!video) {
-        stream.getTracks().forEach((t) => t.stop())
-        return false
-      }
-
-      video.srcObject = stream
-      await video.play()
-      setCameraReady(true)
-      return true
+      return attachStreamToVideo(stream)
     } catch (err) {
-      setCameraError(
-        err instanceof Error
-          ? err.message
-          : 'Camera access denied. Please allow webcam permissions.',
-      )
+      const name = err instanceof DOMException ? err.name : ''
+      const message =
+        name === 'NotAllowedError'
+          ? 'Camera permission denied. Allow camera access in your browser settings, then try again.'
+          : name === 'NotFoundError'
+            ? 'No camera found. Connect a webcam and try again.'
+            : name === 'NotReadableError'
+              ? 'Camera is in use by another app. Close other apps using the webcam and try again.'
+              : err instanceof Error
+                ? err.message
+                : 'Camera access denied. Please allow webcam permissions.'
+      setCameraError(message)
       return false
     }
-  }, [])
+  }, [attachStreamToVideo])
+
+  useEffect(() => {
+    const pending = pendingStreamRef.current
+    if (!pending || cameraReady) return
+
+    void attachStreamToVideo(pending).then((ok) => {
+      if (ok) pendingStreamRef.current = null
+    })
+  }, [attachStreamToVideo, cameraReady, phase])
 
   const stopCamera = useCallback(() => {
+    pendingStreamRef.current?.getTracks().forEach((t) => t.stop())
+    pendingStreamRef.current = null
+
     const video = videoRef.current
     if (video?.srcObject instanceof MediaStream) {
       video.srcObject.getTracks().forEach((t) => t.stop())
